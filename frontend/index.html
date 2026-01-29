@@ -1,0 +1,999 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard - Sellora Air Quality</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet">
+
+<style>
+body { background-color: #f8f9fa; font-family: 'Inter', sans-serif; }
+.navbar { background: white; border-bottom: 1px solid #eee; }
+.nav-link { color: #555 !important; font-weight: 500; cursor:pointer; }
+
+.search-container { 
+    background: white; 
+    border-radius: 20px; 
+    padding: 30px; 
+    box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+    max-width: 900px;
+    margin: 0 auto;
+}
+.input-group-custom {
+    background-color: #fcf6f6; 
+    border: 1px solid #f2e4e4; 
+    border-radius: 12px;
+    padding: 10px;
+    margin-bottom: 15px;
+}
+.input-group-custom input {
+    border: none;
+    background: transparent;
+    box-shadow: none !important;
+}
+
+.aqi-card-result {
+    border-radius: 20px;
+    overflow: hidden;
+    border: none;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+    max-width: 900px;
+    margin: 30px auto;
+    display: none;
+}
+.aqi-header { background-color: #a37cb5; padding: 30px; color: white; }
+.aqi-number-box {
+    background: rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(5px);
+    padding: 15px; border-radius: 12px;
+    text-align: center; min-width: 100px;
+}
+.location-card-result {
+    border-radius: 20px;
+    overflow: hidden;
+    border: none;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+    max-width: 900px;
+    margin: 20px auto;
+    display: none; 
+}
+
+.location-header {
+    background-color: #4e9af1; 
+    padding: 20px;
+    color: white;
+}
+</style>
+</head>
+
+<body>
+
+<nav class="navbar navbar-expand-lg navbar-light shadow-sm mb-5">
+<div class="container-fluid">
+    <a class="navbar-brand fw-bold px-3" href="#" id="navHome">Home</a>
+    <div class="navbar-nav d-flex flex-row me-auto">
+        <a class="nav-link px-3" id="navLocation" href="javascript:void(0)">Location</a>
+        <a class="nav-link px-3" id="navAirQuality" href="javascript:void(0)">Air Quality</a>
+        <a class="nav-link px-3">Pollutant</a>
+        <a class="nav-link px-3" href="javascript:void(0)" id="navWeather">Weather</a>
+    </div>
+    <button class="btn btn-outline-danger btn-sm" onclick="logout()">Logout</button>
+</div>
+</nav>
+
+<div class="container mt-4" id="locationSection" style="display:none;">
+    <div class="search-container">
+        <h5 class="fw-bold mb-3">Daftar Master Lokasi (Database)</h5>
+        <div class="d-flex gap-2 mb-3">
+            <input type="text" id="searchCity" class="form-control" placeholder="City">
+            <input type="text" id="searchCountry" class="form-control" placeholder="Country">
+            <button class="btn btn-dark" onclick="searchLocationDetail()">Search</button>
+        </div>
+        <table class="table table-hover align-middle">
+            <thead>
+                <tr>
+                    <th>City</th>
+                    <th>State</th>
+                    <th>Country</th>
+                    <th>Lat</th>
+                    <th>Lon</th>
+                    <th>Aksi</th>
+                </tr>
+            </thead>
+            <tbody id="locationBody"></tbody> 
+        </table>
+    </div>
+</div>
+
+<div class="container mt-4" id="airQualitySection" style="display:none;">
+    <div class="search-container">
+        <h5 class="fw-bold mb-3">Data Air Quality (Database)</h5>
+        <div class="d-flex gap-2 mb-3">
+            <input type="text" id="searchCity" class="form-control" placeholder="City">
+            <input type="text" id="searchCountry" class="form-control" placeholder="Country">
+            <button class="btn btn-dark" onclick="searchAirQuality()">Search</button>
+        </div>
+
+        <table class="table table-hover align-middle">
+            <thead>
+                <tr>
+                    <th>City</th>
+                    <th>Country</th>
+                    <th>AQI</th>
+                    <th>Pollutant</th>
+                    <th>Temp</th>
+                    <th>Humidity</th>
+                    <th>Aksi</th>
+                </tr>
+            </thead>
+            <tbody id="airQualityBody"></tbody>
+        </table>
+    </div> 
+</div>
+
+<div class="container mt-4" id="weatherSection" style="display:none;">
+    <div class="search-container">
+        <h5 class="fw-bold mb-3">Data Cuaca (Database)</h5>
+        <div class="d-flex gap-2 mb-3">
+            <input type="text" id="searchWeatherCity" class="form-control" placeholder="Cari kota (contoh: Jakarta)">
+            <button class="btn btn-dark" onclick="searchLatestWeather()">Search</button>
+        </div>
+        <table class="table table-hover align-middle">
+            <thead class="table-dark">
+                <tr>
+                    <th>Waktu</th>
+                    <th>Kota</th>
+                    <th>Suhu</th>
+                    <th>Lembap</th>
+                    <th>Tekanan</th>
+                    <th>Angin</th>
+                    <th>Aksi</th>
+                </tr>
+            </thead>
+            <tbody id="weatherTableBody"></tbody>
+        </table>
+    </div>
+</div>
+
+<div class="container" id="homeSection">
+    <div class="row">
+        <div class="col-md-6 mb-4">
+            <div class="search-container h-100">
+                <h5 class="fw-bold mb-1">Cek Kualitas Udara Real-time</h5>
+                <p class="text-muted small mb-4">Dapatkan data polusi udara langsung dari IQAir</p>
+                <form id="aqiSearchForm">
+                    <div class="input-group-custom"><input type="text" id="city" class="form-control" placeholder="City" required></div>
+                    <div class="input-group-custom"><input type="text" id="state" class="form-control" placeholder="State" required></div>
+                    <div class="input-group-custom"><input type="text" id="country" class="form-control" placeholder="Country" required></div>
+                    <button type="submit" class="btn btn-dark w-100 py-2">Cari Kualitas Udara</button>
+                </form>
+
+                <div id="aqiCard" class="card aqi-card-result border-0 shadow-sm" style="display: none; border-radius: 20px; overflow: hidden;">
+                    <div class="aqi-header" style="background-color: #a37cb5; color: white; padding: 20px;">
+                        <div class="d-flex align-items-center justify-content-between mb-3">
+                            <div class="d-flex align-items-center">
+                                <div class="aqi-number-box me-3" style="background: rgba(255,255,255,0.2); padding: 10px; border-radius: 12px; text-align: center; min-width: 80px;">
+                                    <h3 class="fw-bold mb-0" id="displayAqi">--</h3>
+                                    <small style="font-size: 0.6rem;">AQI US</small>
+                                </div>
+                                <div>
+                                    <h4 class="fw-bold mb-0" id="displayStatus" style="font-size: 1.2rem;">--</h4>
+                                    <p class="mb-0 small opacity-75" id="displayCity">--</p>
+                                </div>
+                            </div>
+                            <button class="btn btn-light btn-sm fw-bold shadow-sm" style="border-radius: 8px; font-size: 0.7rem;" onclick="saveToDb()">Simpan ke DB</button>
+                        </div>
+                        <hr class="my-3 opacity-25">
+                        <div class="d-flex justify-content-between small">
+                            <span>Polutan Utama: <strong id="displayPollutant">--</strong></span>
+                            <span id="displayTime">--</span>
+                        </div>
+                    </div>
+                    <div class="card-body bg-white py-3">
+                        <div class="row text-center text-secondary small">
+                            <div class="col-4 border-end">
+                                <span>≈</span> <span class="fw-bold" id="displayTemp">--°</span>
+                            </div>
+                            <div class="col-4 border-end">
+                                <span>▲</span> <span class="fw-bold" id="displayWind">-- km/h</span>
+                            </div>
+                            <div class="col-4">
+                                <span>💧</span> <span class="fw-bold" id="displayHum">-- %</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6 mb-4">
+            <div class="search-container h-100">
+                <h5 class="fw-bold mb-1">Daftarkan Master Lokasi</h5>
+                <p class="text-muted small mb-4">Cari koordinat kota untuk disimpan ke database</p>
+                <form id="locationSearchForm">
+                    <div class="input-group-custom"><input type="text" id="locCity" class="form-control" placeholder="City" required></div>
+                    <div class="input-group-custom"><input type="text" id="locState" class="form-control" placeholder="State" required></div>
+                    <div class="input-group-custom"><input type="text" id="locCountry" class="form-control" placeholder="Country" required></div>
+                    <button type="submit" class="btn btn-outline-dark w-100 py-2">Cari Koordinat</button>
+                </form>
+
+                <div id="locPreview" class="card aqi-card-result border-0 shadow-sm mt-3" style="display: none;">
+                    <div class="aqi-header" style="background-color: #4e9af1; color: white; padding: 20px; border-radius: 20px 20px 0 0;">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h4 class="fw-bold mb-0" id="resCityText">City Name</h4>
+                                <p class="mb-0 small opacity-75">Koordinat Ditemukan</p>
+                            </div>
+                            <div class="aqi-number-box" style="min-width: 120px;">
+                                <div class="small" style="font-size: 0.7rem;">Lat: <span id="resLat">--</span></div>
+                                <div class="small" style="font-size: 0.7rem;">Lon: <span id="resLon">--</span></div>
+                            </div>
+                        </div>
+                        <button class="btn btn-light btn-sm w-100 mt-3 fw-bold" onclick="saveLocationToDb()">Simpan Lokasi Ini</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6 mb-4">
+            <div class="search-container h-100">
+                <h5 class="fw-bold mb-1">Cek Detail Polutan Udara</h5>
+                <p class="text-muted small mb-4">Analisis konsentrasi partikel polusi real-time</p>
+                <div class="input-group-custom"><input type="text" id="polCity" class="form-control" placeholder="City" required></div>
+                <div class="input-group-custom"><input type="text" id="polState" class="form-control" placeholder="State" required></div>
+                <div class="input-group-custom"><input type="text" id="polCountry" class="form-control" placeholder="Country" required></div>
+                <button type="button" class="btn btn-warning w-100 py-2 fw-bold" onclick="searchPollutantAPI()">Cari Detail Polutan</button>
+
+                <div id="polCard" class="card aqi-card-result border-0 shadow-sm mt-3" style="display: none; border-radius: 20px; overflow: hidden;">
+                    <div class="aqi-header" style="background-color: #f39c12; color: white; padding: 20px;">
+                        <div class="d-flex align-items-center justify-content-between">
+                            <div>
+                                <h4 class="fw-bold mb-0" id="polResCity">City Name</h4>
+                                <small id="polResTime" class="opacity-75">--</small>
+                            </div>
+                            <button class="btn btn-light btn-sm fw-bold" onclick="savePollutantToDb()">Simpan ke DB</button>
+                        </div>
+                    </div>
+                    <div class="card-body bg-white py-3">
+                        <div class="row text-center small mb-2">
+                            <div class="col-4 border-end">
+                                <span class="text-muted">PM2.5</span><br>
+                                <span class="fw-bold text-danger" id="valPm25">--</span>
+                            </div>
+                            <div class="col-4 border-end">
+                                <span class="text-muted">PM10</span><br>
+                                <span class="fw-bold text-warning" id="valPm10">--</span>
+                            </div>
+                            <div class="col-4">
+                                <span class="text-muted">O₃ (Ozon)</span><br>
+                                <span class="fw-bold text-success" id="valO3">--</span>
+                            </div>
+                        </div>
+                        <div class="row text-center small">
+                            <div class="col-4 border-end">
+                                <span class="text-muted">NO₂</span><br>
+                                <span class="fw-bold" id="valNo2">--</span>
+                            </div>
+                            <div class="col-4 border-end">
+                                <span class="text-muted">SO₂</span><br>
+                                <span class="fw-bold" id="valSo2">--</span>
+                            </div>
+                            <div class="col-4">
+                                <span class="text-muted">CO</span><br>
+                                <span class="fw-bold" id="valCo">--</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="search-container bg-light p-4" style="border-radius: 20px;">
+            <h5 class="fw-bold mb-3">Cek Polutan Udara (Real-time)</h5>
+            <p class="text-muted small mb-4">Input City, State, dan Country dengan benar</p>
+            <div class="row g-2 mb-3">
+                <div class="col-md-3">
+                    <input type="text" id="pollutantCity" class="form-control mb-2" placeholder="City (Jakarta)" required>
+                </div>
+                <div class="col-md-3">
+                    <input type="text" id="pollutantState" class="form-control mb-2" placeholder="State (Jakarta)" required>
+                </div>
+                <div class="col-md-3">
+                    <input type="text" id="pollutantCountry" class="form-control mb-3" placeholder="Country (Indonesia)" required>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="search-container bg-light p-4" style="border-radius: 20px;">
+    <h5 class="fw-bold mb-1"><i class="bi bi-cloud-sun"></i> Cek Cuaca Kota</h5>
+    <p class="text-muted small mb-4">Dapatkan informasi suhu dan cuaca terkini</p>
+    <div class="row g-2 mb-3">
+        <div class="col-md-3">
+            <input type="text" id="weatherCity" class="form-control" placeholder="City (Bandung)">
+        </div>
+        <div class="col-md-3">
+            <input type="text" id="weatherState" class="form-control" placeholder="State (West Java)">
+        </div>
+        <div class="col-md-3">
+            <input type="text" id="weatherCountry" class="form-control" placeholder="Country (Indonesia)">
+        </div>
+        <div class="col-md-3">
+            <button class="btn btn-dark w-100" onclick="searchWeatherByCityAPI()">Search API</button>
+        </div>
+    </div>
+
+    <div id="weatherCard" class="card mt-4 border-0 shadow" style="display: none; border-radius: 20px; background: linear-gradient(135deg, #6dd5ed, #2193b0); color: white;">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h3 class="fw-bold mb-0" id="wResCity">--</h3>
+                    <p id="wTime" class="small opacity-75">--</p>
+                </div>
+                <div class="text-end">
+                    <h1 class="fw-bold mb-0"><span id="wTemp">--</span>°C</h1>
+                </div>
+            </div>
+            <hr class="bg-white">
+            <div class="row text-center">
+                <div class="col-4 border-end">
+                    <p class="small mb-1">Lembap</p>
+                    <h6 class="fw-bold"><span id="wHum">--</span>%</h6>
+                </div>
+                <div class="col-4 border-end">
+                    <p class="small mb-1">Tekanan</p>
+                    <h6 class="fw-bold"><span id="wPres">--</span> hPa</h6>
+                </div>
+                <div class="col-4">
+                    <p class="small mb-1">Angin</p>
+                    <h6 class="fw-bold"><span id="wWind">--</span> m/s</h6>
+                </div>
+            </div>
+            <div class="mt-3">
+                <button type="button" onclick="saveWeatherToDb()" class="btn btn-light btn-sm w-100 fw-bold text-primary">Simpan Data Cuaca</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const token = localStorage.getItem('token');
+let currentData = null; 
+
+document.getElementById('aqiSearchForm').addEventListener('submit', async (e) => {
+    e.preventDefault(); 
+    if (!token) {
+        alert("Kamu belum login! Silakan login dulu.");
+        return;
+    }
+    const city = document.getElementById('city').value;
+    const state = document.getElementById('state').value;
+    const country = document.getElementById('country').value;
+    try {
+        const response = await fetch(`http://localhost:8000/api/air-quality?city=${city}&state=${state}&country=${country}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const result = await response.json();
+        if (response.ok) {
+            currentData = result; 
+            document.getElementById('aqiCard').style.display = 'block';
+            document.getElementById('displayAqi').innerText = result.aqi_value || result.aqi;
+            document.getElementById('displayCity').innerText = `${city}, ${country}`;
+            document.getElementById('displayStatus').innerText = (result.aqi > 100) ? "Tidak Sehat" : "Baik/Sedang";
+            document.getElementById('displayTemp').innerText = `${result.temperature || 0}°`;
+            document.getElementById('displayHum').innerText = `${result.humidity || 0}%`;
+            document.getElementById('displayPollutant').innerText = result.main_pollutant || 'PM2.5';
+            document.getElementById('displayTime').innerText = new Date().toLocaleTimeString();
+        } else {
+            alert(result.msg || "Data tidak ditemukan");
+        }
+    } catch (err) {
+        alert("Gagal koneksi ke server");
+    }
+});
+
+document.getElementById('locationSearchForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const city = document.getElementById('locCity').value;
+    const state = document.getElementById('locState').value;
+    const country = document.getElementById('locCountry').value;
+    try {
+        const res = await fetch(`http://localhost:8000/api/location/search?city=${city}&state=${state}&country=${country}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await res.json();
+        if (res.ok) {
+            currentLocData = data; 
+            document.getElementById('locPreview').style.display = 'block'; 
+            document.getElementById('resCityText').innerText = `${data.city}, ${data.country}`;
+            document.getElementById('resLat').innerText = data.latitude;
+            document.getElementById('resLon').innerText = data.longitude;
+        } else {
+            alert(data.msg || "Lokasi tidak ditemukan");
+        }
+    } catch (err) {
+        console.error(err);
+        alert("Gagal koneksi ke server");
+    }
+});
+
+async function saveToDb() {
+    if (!currentData) {
+        alert("Cari data kota dulu!");
+        return;
+    }
+    try {
+        const response = await fetch('http://localhost:8000/api/air-quality', {
+            method: 'POST',
+            headers: { 
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json' 
+            },
+            body: JSON.stringify({
+                city: currentData.city,
+                state: currentData.state,
+                country: currentData.country,
+                aqi: currentData.aqi_value || currentData.aqi,
+                main_pollutant: currentData.main_pollutant,
+                temperature: currentData.temperature,
+                humidity: currentData.humidity
+            })
+        });
+        const result = await response.json();
+        if (response.ok) {
+            alert("Berhasil! Data sudah masuk ke tabel air_quality.");
+        } else {
+            alert("Gagal simpan: " + result.msg);
+        }
+    } catch (err) {
+        console.error(err);
+        alert("Terjadi kesalahan koneksi ke server.");
+    }
+}
+
+let currentLocData = null;
+
+document.getElementById('locationSearchForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const city = document.getElementById('locCity').value;
+    const state = document.getElementById('locState').value;
+    const country = document.getElementById('locCountry').value;
+    try {
+        const res = await fetch(`http://localhost:8000/api/location/search?city=${city}&state=${state}&country=${country}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await res.json();
+        if (res.ok) {
+            currentLocData = data; 
+            document.getElementById('locPreview').style.display = 'block'; 
+            document.getElementById('resCityText').innerText = `${data.city}, ${data.country}`;
+            document.getElementById('resLat').innerText = data.latitude;
+            document.getElementById('resLon').innerText = data.longitude;
+        } else {
+            alert(data.msg || "Lokasi tidak ditemukan");
+        }
+    } catch (err) {
+        console.error("Kesalahan di Frontend:", err);
+    }
+});
+
+async function saveLocationToDb() {
+    if (!currentLocData) return;
+    try {
+        const res = await fetch('http://localhost:8000/api/locations', {
+            method: 'POST',
+            headers: { 
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json' 
+            },
+            body: JSON.stringify({
+                city: currentLocData.city,       
+                state: currentLocData.state,     
+                country: currentLocData.country,
+                latitude: currentLocData.latitude,
+                longitude: currentLocData.longitude
+            })
+        });
+        const result = await res.json();
+        if (res.ok) {
+            alert("Mantap! Berhasil masuk Database.");
+            document.getElementById('locPreview').style.display = 'none';
+        } else {
+            alert("Gagal Simpan: " + result.msg);
+        }
+    } catch (err) {
+        alert("Server Error! Cek terminal backend kamu.");
+    }
+}
+
+async function loadLocations() {
+    try {
+        const res = await fetch('http://localhost:8000/api/location/user', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await res.json();
+        const tbody = document.getElementById('locationBody');
+        if (!tbody) return;
+        tbody.innerHTML = ''; 
+        if (res.ok && Array.isArray(data) && data.length > 0) {
+            data.forEach((row) => {
+                tbody.innerHTML += `
+                    <tr>
+                        <td>${row.city_name}</td>
+                        <td>${row.state}</td>
+                        <td>${row.country}</td>
+                        <td>${row.latitude}</td>
+                        <td>${row.longitude}</td>
+                        <td>
+                            <button class="btn btn-danger btn-sm" onclick="deleteLocation('${row.city_name}')">Hapus</button>
+                        </td>
+                    </tr>
+                `;
+            });
+        } else {
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center">Belum ada lokasi terdaftar</td></tr>';
+        }
+    } catch (err) {
+        alert("Gagal koneksi ke database");
+    }
+}
+
+async function searchLocationDetail() {
+    const city = document.getElementById('searchCity').value;
+    if (!city) {
+        loadLocations();
+        return;
+    }
+    try {
+        const res = await fetch(`http://localhost:8000/api/location/detail/${city}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await res.json();
+        const tbody = document.getElementById('locationBody');
+        tbody.innerHTML = ''; 
+        if (res.ok && data) {
+            tbody.innerHTML = `
+                <tr>
+                    <td>${data.city_name}</td>
+                    <td>${data.state}</td>
+                    <td>${data.country}</td>
+                    <td>${data.latitude}</td>
+                    <td>${data.longitude}</td>
+                    <td>
+                        <button class="btn btn-danger btn-sm" onclick="deleteLocation(${data.id})">Hapus</button>
+                    </td>
+                </tr>
+            `;
+        } else {
+            tbody.innerHTML = `<tr><td colspan="6" class="text-center">${data.msg || "Kota tidak ditemukan di database"}</td></tr>`;
+        }
+    } catch (err) {
+        console.error(err);
+        alert("Gagal melakukan pencarian detail");
+    }
+}
+
+async function deleteLocation(cityName) {
+    if (!confirm(`Yakin mau hapus data lokasi ${cityName} dari database?`)) return;
+    try {
+        const res = await fetch(`http://localhost:8000/api/location/${cityName}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const result = await res.json();
+        if (res.ok) {
+            alert('Mantap! Data berhasil dihapus.');
+            loadLocations(); 
+        } else {
+            alert('Gagal hapus: ' + result.msg);
+        }
+    } catch (err) {
+        console.error("Error pas hapus:", err);
+        alert('Server bermasalah, gagal hapus data.');
+    }
+}
+
+async function loadAirQuality() {
+    const res = await fetch('http://localhost:8000/api/air-quality/location', {
+        headers: { Authorization: `Bearer ${token}` }
+    });
+    const data = await res.json();
+    renderTable(data);
+}
+
+async function searchAirQuality() {
+    const city = document.getElementById('searchCity').value;
+    const country = document.getElementById('searchCountry').value;
+    const res = await fetch(
+        `http://localhost:8000/api/air-quality/location?city=${city}&country=${country}`,
+        {
+            headers: { Authorization: `Bearer ${token}` }
+        }
+    );
+    const data = await res.json();
+    renderTable(data);
+}
+
+function renderTable(data) {
+    const tbody = document.getElementById('airQualityBody');
+    tbody.innerHTML = '';
+    if (!data || data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center">Data kosong</td></tr>';
+        return;
+    }
+    data.forEach(row => {
+        tbody.innerHTML += `
+            <tr>
+                <td>${row.city_name}</td>
+                <td>${row.country}</td>
+                <td>${row.aqi_value}</td>
+                <td>${row.main_pollutant}</td>
+                <td>${row.temperature}°C</td>
+                <td>${row.humidity}%</td>
+                <td>
+                    <button class="btn btn-danger btn-sm" onclick="deleteAirQuality(${row.id})">Hapus</button>
+                </td>
+            </tr>
+        `;
+    });
+}
+
+async function deleteAirQuality(id) {
+    if (!confirm('Yakin hapus data ini?')) return;
+    const res = await fetch(
+        `http://localhost:8000/api/air-quality/${id}`,
+        {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${token}` }
+        }
+    );
+    const data = await res.json();
+    if (res.ok) {
+        alert('Data berhasil dihapus');
+        loadAirQuality();
+    } else {
+        alert(data.msg || 'Gagal hapus data');
+    }
+}
+
+async function saveLocationToDb() {
+    if (!currentLocData) return;
+    try {
+        const res = await fetch('http://localhost:8000/api/locations', {
+            method: 'POST',
+            headers: { 
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json' 
+            },
+            body: JSON.stringify(currentLocData)
+        });
+        if (res.ok) {
+            alert("Berhasil! Lokasi sudah tersimpan di Master Data.");
+            document.getElementById('locPreview').style.display = 'none';
+            document.getElementById('locationSearchForm').reset();
+        } else {
+            alert("Gagal simpan lokasi");
+        }
+    } catch (err) {
+        alert("Terjadi kesalahan koneksi");
+    }
+}
+
+async function deleteAirQualityByCity(city) {
+  if (!confirm(`Hapus semua data AQI kota ${city}?`)) return;
+  const token = localStorage.getItem('token');
+  try {
+    const res = await fetch(
+      `http://localhost:8000/api/air-quality/city/${city}`,
+      {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      }
+    );
+    const result = await res.json();
+    if (res.ok) {
+      alert(result.msg);
+      loadAirQuality(); 
+    } else {
+      alert(result.msg || 'Gagal menghapus data');
+    }
+  } catch (err) {
+    console.error(err);
+    alert('Gagal koneksi ke server');
+  }
+}
+
+let currentPollutantData = null; 
+
+async function searchPollutantAPI() {
+    const city = document.getElementById('polCity').value;
+    const state = document.getElementById('polState').value;
+    const country = document.getElementById('polCountry').value;
+    const token = localStorage.getItem('token');
+    if (!city || !state || !country) {
+        alert("Lengkapi data kota, provinsi, dan negara!");
+        return;
+    }
+    try {
+        const res = await fetch(`http://localhost:8000/api/pollutant?city=${city}&state=${state}&country=${country}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const result = await res.json();
+        if (res.ok) {
+            currentPollutantData = result;
+            const p = result.pollutants;
+            document.getElementById('polCard').style.display = 'block';
+            document.getElementById('displayAqi').innerText = result.aqi_total;
+            document.getElementById('valPm25').innerText = p.p2; 
+            document.getElementById('valPm10').innerText = p.p1;
+            document.getElementById('valO3').innerText   = p.o3;
+            document.getElementById('valNo2').innerText  = p.n2;
+            document.getElementById('valSo2').innerText  = p.s2;
+            document.getElementById('valCo').innerText   = p.co;
+        } else {
+            alert("Server Error: " + result.message);
+        }
+    } catch (err) {
+        alert("Gagal koneksi ke server polutan.");
+        console.log(err);
+    }
+}
+
+async function savePollutantToDb() {
+    if (!currentPollutantData) {
+        alert("Cari data polutan terlebih dahulu!");
+        return;
+    }
+    const token = localStorage.getItem('token');
+    const city = document.getElementById('polCity').value; 
+    try {
+        const res = await fetch('http://localhost:8000/api/pollutant/sync', {
+            method: 'POST',
+            headers: { 
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json' 
+            },
+            body: JSON.stringify({
+                city: city,
+                aqi: currentPollutantData.aqi_total,
+                main_pollutant: currentPollutantData.main_pollutant
+            })
+        });
+        const result = await res.json();
+        if (res.ok) {
+            alert("Data polutan berhasil disimpan ke riwayat database!");
+        } else {
+            alert("Gagal menyimpan: " + result.msg);
+        }
+    } catch (err) {
+        console.error(err);
+        alert("Terjadi kesalahan koneksi saat menyimpan data.");
+    }
+}
+
+let currentWeatherData = null; 
+
+async function searchWeatherByCityAPI() { 
+    const city = document.getElementById('weatherCity').value;
+    const state = document.getElementById('weatherState').value;
+    const country = document.getElementById('weatherCountry').value;
+    const token = localStorage.getItem('token');
+    if (!city || !state || !country) {
+        alert("Semua kolom harus diisi!");
+        return;
+    }
+    try {
+        const res = await fetch(`http://localhost:8000/api/weather?city=${city}&state=${state}&country=${country}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const result = await res.json();
+        if (res.ok) {
+            document.getElementById('weatherCard').style.display = 'block';
+            document.getElementById('wResCity').innerText = `${result.city}, ${state}`;
+            document.getElementById('wTemp').innerText = result.temperature;
+            document.getElementById('wHum').innerText = result.humidity;
+            document.getElementById('wPres').innerText = result.pressure;
+            document.getElementById('wWind').innerText = result.wind_speed;
+            currentWeatherData = result; 
+        } else {
+            alert("Gagal: " + (result.msg || "Data tidak ditemukan"));
+        }
+    } catch (err) {
+        alert("Gagal koneksi ke server.");
+    }
+}
+
+async function saveWeatherToDb() {
+    if (!currentWeatherData) return alert("Cari data cuaca dulu!");
+    const token = localStorage.getItem('token'); 
+    try {
+        const res = await fetch('http://localhost:8000/api/weather/sync', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                city: currentWeatherData.city,
+                temperature: currentWeatherData.temperature,
+                humidity: currentWeatherData.humidity,
+                pressure: currentWeatherData.pressure,
+                wind_speed: currentWeatherData.wind_speed,
+                state: currentWeatherData.state,
+                country: currentWeatherData.country,
+                latitude: currentWeatherData.latitude,
+                longitude: currentWeatherData.longitude
+            })
+        });
+        const result = await res.json();
+        if (res.ok) {
+            alert("Berhasil! Data cuaca tersimpan ke database.");
+            if (typeof loadWeatherHistory === "function") {
+                loadWeatherHistory(currentWeatherData.city);
+            }
+            return; 
+        } else {
+            alert("Gagal simpan: " + result.msg);
+        }
+    } catch (err) {
+        console.error(err);
+        alert("Error koneksi saat menyimpan data");
+    }
+}
+
+async function loadAllWeather() {
+    const tbody = document.getElementById('weatherTableBody');
+    tbody.innerHTML = '<tr><td colspan="6" class="text-center">Loading...</td></tr>';
+    try {
+        const res = await fetch('http://localhost:8000/api/weather/history', {
+            headers: { Authorization: `Bearer ${token}` }
+        });
+        const result = await res.json();
+        tbody.innerHTML = '';
+        if (!res.ok || !result.data || result.data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">Data cuaca kosong</td></tr>';
+            return;
+        }
+        result.data.forEach(row => {
+            tbody.innerHTML += `
+                <tr>
+                    <td>${new Date(row.recorded_at).toLocaleString('id-ID')}</td>
+                    <td>${row.city_name}</td>
+                    <td>${row.temperature}°C</td>
+                    <td>${row.humidity}%</td>
+                    <td>${row.pressure ?? '-'} hPa</td>
+                    <td>${row.wind_speed ? row.wind_speed.toFixed(2) : '-'} m/s</td>
+                    <td>
+                        <button class="btn btn-danger btn-sm" onclick="deleteWeatherByCity('${row.city_name}')">Hapus</button>
+                    </td>
+                </tr>
+            `;
+        });
+    } catch (err) {
+        console.error(err);
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-danger">Gagal koneksi ke server</td></tr>';
+    }
+}
+
+async function searchLatestWeather() {
+    const city = document.getElementById('searchWeatherCity').value.trim();
+    const tbody = document.getElementById('weatherTableBody');
+    if (!city) {
+        loadAllWeather();
+        return;
+    }
+    tbody.innerHTML = '<tr><td colspan="6" class="text-center">Loading...</td></tr>';
+    try {
+        const res = await fetch(
+            `http://localhost:8000/api/weather/latest/${city}`,
+            {
+                headers: { Authorization: `Bearer ${token}` }
+            }
+        );
+        const result = await res.json();
+        tbody.innerHTML = '';
+        if (!res.ok || !result.data || result.data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">Data cuaca untuk "' + city + '" tidak ditemukan</td></tr>';
+            return;
+        }
+        result.data.forEach(row => {
+            tbody.innerHTML += `
+                <tr>
+                    <td>${new Date(row.recorded_at).toLocaleString('id-ID')}</td>
+                    <td>${row.city_name}</td>
+                    <td>${row.temperature}°C</td>
+                    <td>${row.humidity}%</td>
+                    <td>${row.pressure || '-'}</td>
+                    <td>${row.wind_speed ? row.wind_speed.toFixed(2) : '-'} m/s</td>
+                </tr>
+            `;
+        });
+    } catch (err) {
+        console.error(err);
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-danger">Gagal koneksi ke server</td></tr>';
+    }
+}
+
+async function deleteWeatherByCity(city) {
+  if (!confirm(`Hapus semua data cuaca kota ${city}?`)) return;
+  const token = localStorage.getItem('token');
+  try {
+    const res = await fetch(
+      `http://localhost:8000/api/weather/city/${city}`,
+      {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      }
+    );
+    const result = await res.json();
+    if (res.ok) {
+      alert(result.msg);
+      loadAllWeather(); 
+    } else {
+      alert(result.msg || 'Gagal menghapus data');
+    }
+  } catch (err) {
+    console.error(err);
+    alert('Gagal koneksi ke server');
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const homeSection = document.getElementById('homeSection');
+    const airSection = document.getElementById('airQualitySection');
+    const weatherSection = document.getElementById('weatherSection');
+    const locSection = document.getElementById('locationSection');
+
+    function hideAllSections() {
+        homeSection.style.display = 'none';
+        airSection.style.display = 'none';
+        weatherSection.style.display = 'none';
+        locSection.style.display = 'none';
+    }
+
+    document.getElementById('navHome').onclick = (e) => {
+        e.preventDefault();
+        hideAllSections();
+        homeSection.style.display = 'block';
+    };
+
+    document.getElementById('navAirQuality').onclick = (e) => {
+        e.preventDefault();
+        hideAllSections();
+        airSection.style.display = 'block';
+        loadAirQuality();
+    };
+
+    document.getElementById('navLocation').onclick = (e) => {
+        e.preventDefault();
+        hideAllSections();
+        locSection.style.display = 'block';
+        loadLocations();
+    };
+
+    document.getElementById('navWeather').onclick = (e) => {
+        e.preventDefault();
+        hideAllSections();
+        weatherSection.style.display = 'block';
+        loadAllWeather();
+    };
+
+    document.getElementById('searchWeatherCity').addEventListener('input', (e) => {
+        if (e.target.value === '') {
+            loadAllWeather();
+        }
+    });
+});
+
+function logout() {
+    localStorage.removeItem('token');
+    location.href = 'login.html';
+}
+</script>
+</body>
+</html>

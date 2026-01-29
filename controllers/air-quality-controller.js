@@ -1,0 +1,133 @@
+const db = require('../config/db');
+const airQualityModel = require('../models/air-quality-model');
+const iqair = require('../config/iqair');
+const locationModel = require('../models/location-model');
+
+const axios = require('axios');
+
+
+const getAirQuality = async (req, res) => {
+    const { city, state, country } = req.query;
+
+    if (!city || !state || !country) {
+        return res.status(400).json({ msg: 'City, State, and Country are required!' });
+    }
+
+    try {
+        const response = await iqair.get('/city', {
+            params: { city, state, country }
+        });
+
+        const result = airQualityModel.createAirQuality(response.data.data);
+       
+
+        return res.status(200).json(result);
+    } catch (error) {
+        console.error('IQAir Error:', error.response?.data || error.message);
+        return res.status(500).json({ msg: 'Gagal mengambil data dari IQAir' });
+    }
+};
+
+const saveAirQuality = async (req, res) => {
+    const { city, state, country, aqi, main_pollutant, temperature, humidity } = req.body;
+
+    try {
+        let location = await locationModel.getLocationByCity(city);
+
+        if (!location) {
+            console.log(`Kota ${city} belum ada, mendaftarkan ke tabel locations...`);
+            
+            const newLoc = {
+                city,
+                state: state || '',
+                country,
+                latitude: 0, 
+                longitude: 0
+            };
+            
+            await locationModel.addLocation(req.user.id, newLoc);
+
+            location = await locationModel.getLocationByCity(city);
+        }
+
+        await airQualityModel.addAirQuality(location.id, {
+            aqi,
+            main_pollutant,
+            temperature,
+            humidity
+        });
+
+        return res.status(201).json({ msg: 'Berhasil simpan ke database!' });
+    } catch (error) {
+        console.error('Detail Error DB:', error.message);
+        return res.status(500).json({ msg: 'Gagal simpan ke database', detail: error.message });
+    }
+};
+
+const getAirQualityByLocation = async (req, res) => {
+    try {
+        const { city, country } = req.query;
+
+        let sql = `
+            SELECT 
+                a.id,
+                l.city_name,
+                l.country,
+                a.aqi_value,
+                a.main_pollutant,
+                a.temperature,
+                a.humidity
+            FROM air_quality a
+            JOIN locations l ON a.location_id = l.id
+            WHERE 1=1
+        `;
+
+        const params = [];
+
+        if (city) {
+            sql += ' AND l.city_name LIKE ?';
+            params.push(`%${city}%`);
+        }
+
+        if (country) {
+            sql += ' AND l.country LIKE ?';
+            params.push(`%${country}%`);
+        }
+
+        sql += ' ORDER BY a.recorded_at DESC';
+
+        const [rows] = await db.execute(sql, params);
+        res.json(rows);
+
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ msg: 'Gagal ambil data' });
+    }
+};
+
+const deleteAirQuality = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const [result] = await db.execute(
+            'DELETE FROM air_quality WHERE id = ?',
+            [id]
+        );
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ msg: 'Data tidak ditemukan' });
+        }
+
+        res.json({ msg: 'Deleted' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ msg: 'Gagal hapus' });
+    }
+};
+
+module.exports = {
+    getAirQuality,
+    saveAirQuality,
+    getAirQualityByLocation,
+    deleteAirQuality
+};
