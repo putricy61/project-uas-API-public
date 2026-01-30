@@ -3,6 +3,149 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register - EcoAir</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-blue: #4A90E2;
+            --dark-blue: #357ABD;
+            --bg-soft: #F4F7F9;
+            --text-dark: #2C3E50;
+        }
+
+        body { 
+            background-color: var(--bg-soft); 
+            font-family: 'Inter', sans-serif; 
+            color: var(--text-dark);
+        }
+
+        .register-container { max-width: 450px; margin: 60px auto; padding: 20px; }
+        
+        .register-title { 
+            font-weight: 800; 
+            font-size: 2.2rem; 
+            color: var(--primary-blue); 
+            text-align: center; 
+            margin-bottom: 5px;
+            letter-spacing: -1px;
+        }
+
+        .register-subtitle {
+            text-align: center;
+            color: #7F8C8D;
+            margin-bottom: 30px;
+            font-size: 0.95rem;
+        }
+
+        .form-control { 
+            border-radius: 10px; 
+            padding: 10px; 
+            border: 1px solid #DCE4EC;
+        }
+
+        .form-control:focus { 
+            border-color: var(--primary-blue); 
+            box-shadow: 0 0 0 0.25rem rgba(74, 144, 226, 0.1); 
+        }
+
+        .btn-register { 
+            background-color: var(--primary-blue); 
+            border: none; 
+            border-radius: 10px; 
+            padding: 13px; 
+            font-weight: 600; 
+            color: white; 
+            width: 100%; 
+            margin-top: 20px;
+            transition: all 0.3s ease;
+        }
+
+        .btn-register:hover { 
+            background-color: var(--dark-blue); 
+            box-shadow: 0 4px 12px rgba(74, 144, 226, 0.2);
+        }
+
+        .footer-text { text-align: center; margin-top: 20px; color: #95A5A6; font-size: 0.9rem; }
+        .footer-text a { color: var(--primary-blue); text-decoration: none; font-weight: 600; }
+    </style>
+</head>
+<body>
+    <div class="register-container">
+        <h1 class="register-title">Create Account</h1>
+        <p class="register-subtitle">Join us to start monitoring your environment.</p>
+        
+        <div class="card border-0 shadow-sm p-4" style="border-radius: 20px;">
+            <form id="registerForm">
+                <div class="mb-3">
+                    <label class="form-label fw-bold small">FULL NAME / USERNAME</label>
+                    <input type="text" id="username" class="form-control" placeholder="e.g. Putri Draco" required>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold small">EMAIL ADDRESS</label>
+                    <input type="email" id="email" class="form-control" placeholder="putri@example.com" required>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold small">PASSWORD</label>
+                    <input type="password" id="password" class="form-control" placeholder="Min. 8 characters" required>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold small">CONFIRM PASSWORD</label>
+                    <input type="password" id="confirmPassword" class="form-control" placeholder="Repeat your password" required>
+                </div>
+
+                <button type="submit" class="btn-register shadow-sm">Sign Up</button>
+            </form>
+        </div>
+
+        <p class="footer-text">
+            Already have an account? <a href="index.html">Sign In here</a>
+        </p>
+    </div>
+
+    <script>
+        document.getElementById('registerForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const username = document.getElementById('username').value;
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const confirmPassword = document.getElementById('confirmPassword').value;
+
+            // Validasi Password Sederhana
+            if (password !== confirmPassword) {
+                alert("Password tidak cocok!");
+                return;
+            }
+
+            try {
+                const response = await fetch('http://localhost:8000/api/auth/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, email, password })
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    alert('Registrasi Berhasil! Silakan Login.');
+                    window.location.href = 'index.html';
+                } else {
+                    alert('Registrasi Gagal: ' + result.message);
+                }
+            } catch (error) {
+                alert('Gagal menghubungi server.');
+            }
+        });
+    </script>
+</body>
+</html><!-- <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login - Air Quality System</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
@@ -157,4 +300,4 @@
     });
 </script>
 </body>
-</html>
+</html> -->
