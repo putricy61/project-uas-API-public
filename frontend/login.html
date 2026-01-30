@@ -376,3 +376,618 @@
     </script>
 </body>
 </html> -->
+
+
+
+
+
+
+auth.js
+document.addEventListener('DOMContentLoaded', () => {
+    const loginForm = document.getElementById('loginForm');
+
+    if (loginForm) {
+        loginForm.addEventListener('submit', async (e) => {
+            // Ini supaya halaman GAK REFRESH
+            e.preventDefault(); 
+
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+
+            // Ubah tombol jadi loading biar keren
+            const btn = document.querySelector('.btn-login');
+            const originalText = btn.innerText;
+            btn.innerText = 'Logging in...';
+            btn.disabled = true;
+
+            try {
+                const response = await fetch('http://localhost:8000/api/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ email, password })
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    // Simpan token ke "dompet" browser
+                    localStorage.setItem('token', result.token);
+                    localStorage.setItem('user', JSON.stringify(result.user));
+
+                    alert('Login Berhasil! Selamat datang, ' + result.user.username);
+                    
+                    // Pindah ke dashboard
+                    window.location.href = 'dashboard.html';
+                } else {
+                    alert('Login Gagal: ' + result.message);
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Gagal menghubungi server. Pastikan backend (Node.js) kamu sudah nyala dan CORS sudah dipasang.');
+            } finally {
+                // Kembalikan tombol ke semula
+                btn.innerText = originalText;
+                btn.disabled = false;
+            }
+        });
+    }
+});
+
+
+
+dsboard.js
+// ==========================================
+// 1. NAVIGASI & LOGOUT
+// ==========================================
+// GABUNGAN SEMUA MENU NAVIGASI
+function showSection(sectionId) {
+    document.querySelectorAll('.content-section').forEach(s => s.classList.remove('active-section'));
+    const target = document.getElementById(sectionId);
+    if(target) target.classList.add('active-section');
+    
+    document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+
+    // Trigger ambil data sesuai section yang tersisa
+    if(sectionId === 'weather') fetchNews(); // Refresh berita tiap balik ke home
+    if(sectionId === 'aqi') { fetchStats(); fetchFavorites(); }
+    if(sectionId === 'aqiFavorites') fetchAqiFavorites();
+    if(sectionId === 'articleFavs') fetchArticleFavorites();
+    if(sectionId === 'profileSection') getProfile();
+}
+
+function logout() { 
+    if(confirm("Yakin ingin keluar?")) {
+        localStorage.clear(); 
+        window.location.href = 'index.html'; 
+    }
+}
+
+// ==========================================
+// 2. WEATHER (CUACA)
+// ==========================================
+async function fetchWeather() {
+    const city = document.getElementById('cityInput').value;
+    const token = localStorage.getItem('token'); 
+    const infoCard = document.getElementById('weatherInfoCard');
+    const rain = document.getElementById('rainOverlay');
+
+    if (!city) return alert("Masukkan nama kota!");
+    infoCard.innerHTML = '<div class="text-center p-3"><div class="spinner-border text-primary"></div></div>';
+
+    try {
+        const response = await fetch(`http://localhost:8000/api/weather/search?city=${city}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const result = await response.json();
+
+        if (response.ok && result.success) {
+            const data = result.data;
+            infoCard.innerHTML = `
+                <div class="card p-4 border-0 shadow-sm animate__animated animate__fadeIn">
+                    <h5 class="fw-bold text-muted mb-1">${data.city.toUpperCase()}</h5>
+                    <h1 class="display-5 fw-bold text-primary">${data.temp}°C</h1>
+                    <div class="small mt-2">
+                        <div><i class="bi bi-droplets text-info"></i> Hum: ${data.hum}%</div>
+                        <div><i class="bi bi-wind text-secondary"></i> Wind: ${data.ws} m/s</div>
+                    </div>
+                    <button class="btn btn-primary btn-sm mt-3" onclick="saveWeatherFav('${data.city}')">Save to Fav</button>
+                </div>`;
+            if (data.hum > 70) rain.classList.remove('d-none'); else rain.classList.add('d-none');
+        }
+    } catch (e) { alert("Server error!"); }
+}
+
+// Simpan Cuaca ke DB
+async function saveWeatherFav(cityName) {
+    const token = localStorage.getItem('token');
+    try {
+        const response = await fetch('http://localhost:8000/api/weather/favorite', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify({ city: cityName }) 
+        });
+        const result = await response.json();
+        if (response.ok) alert(`⭐ Cuaca ${cityName} tersimpan!`);
+        else alert(result.message);
+    } catch (e) { alert("Gagal simpan favorit cuaca."); }
+}
+
+async function fetchFavorites() {
+    const token = localStorage.getItem('token');
+    const favOutput = document.getElementById('favoritesOutput');
+    try {
+        const response = await fetch('http://localhost:8000/api/weather/favorites', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const result = await response.json();
+        if (result.success) {
+            let html = '';
+            result.data.forEach(item => {
+                html += `
+                <div class="col-md-3"><div class="card p-3 text-center shadow-sm border-0">
+                    <i class="bi bi-geo-alt-fill text-primary"></i>
+                    <h6 class="fw-bold mt-2">${item.city.toUpperCase()}</h6>
+                    <button class="btn btn-sm btn-outline-danger mt-2" onclick="deleteFav(${item.id}, '${item.city}')">Delete</button>
+                </div></div>`;
+            });
+            favOutput.innerHTML = html || '<p class="text-center w-100">No favorites yet</p>';
+        }
+    } catch (e) { console.error(e); }
+}
+
+async function fetchStats() {
+    const token = localStorage.getItem('token');
+    const statsOutput = document.getElementById('statsOutput');
+    try {
+        const response = await fetch('http://localhost:8000/api/weather/stats', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const result = await response.json();
+        if (response.ok && result.success) {
+            const s = result.data;
+            statsOutput.innerHTML = `
+                <div class="col-md-6"><div class="card p-3 bg-primary text-white text-center">
+                    <small>Avg Temp</small><h3 class="fw-bold">${parseFloat(s.average_temp || 0).toFixed(1)}°C</h3>
+                </div></div>
+                <div class="col-md-6"><div class="card p-3 bg-white text-center shadow-sm border">
+                    <small class="text-muted">Avg Humidity</small><h3 class="fw-bold text-primary">${parseFloat(s.average_hum || 0).toFixed(0)}%</h3>
+                </div></div>`;
+        }
+    } catch (e) { console.error(e); }
+}
+
+async function deleteFav(id, cityName) {
+    if(!confirm(`Hapus ${cityName}?`)) return;
+    const token = localStorage.getItem('token');
+    await fetch(`http://localhost:8000/api/weather/favorite/${id}`, {
+        method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` }
+    });
+    fetchFavorites(); fetchStats();
+}
+
+
+// ==========================================
+// 3. AIR QUALITY (AQI)
+// ==========================================
+async function fetchAQI() {
+    const city = document.getElementById('aqiInput').value;
+    const token = localStorage.getItem('token');
+    const aqiOutput = document.getElementById('aqiOutput');
+
+    if (!city) return alert("Ketik nama kota untuk cek AQI!");
+
+    aqiOutput.innerHTML = '<div class="text-center p-4"><div class="spinner-border text-dark"></div></div>';
+
+    try {
+        const response = await fetch(`http://localhost:8000/api/air-quality/search?city=${city}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const result = await response.json();
+
+        if (response.ok && result.success) {
+            const data = result.data;
+            let aqiColor = data.aqi > 100 ? 'text-danger' : (data.aqi > 50 ? 'text-warning' : 'text-success');
+            let bgBadge = data.aqi > 100 ? 'bg-danger' : (data.aqi > 50 ? 'bg-warning text-dark' : 'bg-success');
+            
+            aqiOutput.innerHTML = `
+                <div class="card p-4 border-0 shadow-sm animate__animated animate__fadeInUp">
+                    <h5 class="fw-bold text-muted mb-1">${data.city.toUpperCase()}</h5>
+                    <div class="d-flex align-items-center gap-2">
+                        <h1 class="display-4 fw-bold ${aqiColor} mb-0">${data.aqi}</h1>
+                        <span class="badge ${bgBadge} rounded-pill">AQI</span>
+                    </div>
+                    <hr>
+                    <p class="small mb-3">Polutan Utama: <b>${data.main_pollutant || 'PM2.5'}</b></p>
+                    <button class="btn btn-outline-dark btn-sm w-100" onclick="saveAqiFav('${data.city}')">
+                        <i class="bi bi-heart"></i> Simpan ke Tabel AQI
+                    </button>
+                </div>`;
+        }
+    } catch (e) { alert("Gagal konek ke server AQI!"); }
+}
+
+// Simpan AQI ke DB (Tabel Berbeda)
+async function saveAqiFav(cityName) {
+    const token = localStorage.getItem('token');
+    
+    try {
+        // PERHATIKAN BARIS DI BAWAH INI
+        // Pastikan path-nya adalah 'air-quality', bukan 'weather'
+        const response = await fetch('http://localhost:8000/api/air-quality/favorite', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ city: cityName })
+        });
+
+        const result = await response.json();
+
+        if (response.ok && result.success) {
+            alert(`⭐ Berhasil! Data AQI ${cityName} masuk ke tabel Air Quality.`);
+        } else {
+            alert(`Gagal: ${result.message}`);
+        }
+    } catch (e) {
+        console.error("Error Save AQI:", e);
+        alert("Gagal menyimpan ke tabel Air Quality.");
+    }
+}
+
+async function fetchAqiFavorites() {
+    const token = localStorage.getItem('token');
+    const aqiFavOutput = document.getElementById('aqiFavoritesOutput');
+    
+    aqiFavOutput.innerHTML = '<div class="text-center"><div class="spinner-border text-primary"></div></div>';
+
+    try {
+        // Gunakan endpoint yang kamu kasih tadi
+        const response = await fetch('http://localhost:8000/api/air-quality/favorites', {
+            method: 'GET',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        const result = await response.json();
+
+        if (response.ok && result.success) {
+            let html = '';
+            // Pastikan 'result.data' sesuai dengan struktur JSON dari backend kamu
+            result.data.forEach(item => {
+                html += `
+                <div class="col-md-4">
+                    <div class="card p-3 shadow-sm border-0 animate__animated animate__fadeIn">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="fw-bold mb-1">${item.city.toUpperCase()}</h6>
+                                <small class="text-muted">Tersimpan di tabel AQI</small>
+                            </div>
+                            <i class="bi bi-wind text-info fs-4"></i>
+                        </div>
+                        <hr>
+                        <button class="btn btn-sm btn-outline-danger" onclick="deleteAqiFav(${item.id})">
+                            <i class="bi bi-trash"></i> Hapus
+                        </button>
+                    </div>
+                </div>`;
+            });
+            aqiFavOutput.innerHTML = html || '<p class="text-center w-100">Belum ada favorit AQI.</p>';
+        }
+    } catch (e) {
+        console.error(e);
+        aqiFavOutput.innerHTML = '<div class="alert alert-danger">Gagal mengambil data favorit AQI.</div>';
+    }
+}
+
+async function deleteAqiFav(id) {
+    if(!confirm("Hapus dari favorit AQI?")) return;
+    const token = localStorage.getItem('token');
+    
+    try {
+        // Sesuaikan dengan endpoint delete kamu, biasanya mirip seperti ini:
+        await fetch(`http://localhost:8000/api/air-quality/favorite/${id}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        fetchAqiFavorites(); // Refresh tampilan
+    } catch (e) {
+        alert("Gagal menghapus.");
+    }
+}
+
+// ==========================================
+// 4. STATS & FAVORITES (DARI DB)
+// ==========================================
+
+
+
+async function fetchNews() {
+    const token = localStorage.getItem('token');
+    const newsOutput = document.getElementById('newsOutput');
+    
+    newsOutput.innerHTML = `
+        <div class="col-12 text-center py-5">
+            <div class="spinner-border text-primary" role="status"></div>
+            <p class="mt-2 text-muted">Sinkronisasi berita lingkungan...</p>
+        </div>`;
+
+    try {
+        const response = await fetch('http://localhost:8000/api/articles/all', {
+            method: 'GET',
+            headers: { 
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        const result = await response.json();
+
+        if (response.ok && result.success) {
+            let html = '';
+
+            result.data.forEach(art => {
+                html += `
+                <div class="col-md-4 mb-4 d-flex align-items-stretch">
+                    <div class="card w-100 border-0 shadow-sm overflow-hidden d-flex flex-column" style="border-radius: 15px;">
+                        
+                        <div style="height: 180px; width: 100%; overflow: hidden; background: #eee;">
+                            <img src="${art.urlToImage || 'https://via.placeholder.com/400x200?text=Eco+News'}" 
+                                 style="width: 100%; height: 100%; object-fit: cover;" 
+                                 alt="News Image"
+                                 onerror="this.src='https://via.placeholder.com/400x200?text=Image+Not+Found'">
+                        </div>
+
+                        <div class="card-body p-3 d-flex flex-column flex-grow-1">
+                            <h6 class="fw-bold text-dark mb-2" 
+                                style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; height: 2.6em; line-height: 1.3em;">
+                                ${art.title}
+                            </h6>
+                            
+                            <p class="text-muted mb-4" 
+                               style="font-size: 0.75rem; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; height: 4.5em; line-height: 1.5em;">
+                                ${art.description || 'Klik baca selengkapnya untuk berita lingkungan terbaru.'}
+                            </p>
+
+                            <div class="mt-auto pt-2 border-top">
+                                <a href="${art.url}" target="_blank" 
+                                   class="btn btn-primary btn-sm rounded-pill w-100 py-2 shadow-sm" 
+                                   style="font-size: 0.7rem; font-weight: 600;">
+                                    Baca Selengkapnya
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
+            });
+
+            newsOutput.innerHTML = html || '<p class="text-center w-100">Belum ada berita lingkungan tersedia.</p>';
+        }
+    } catch (e) {
+        newsOutput.innerHTML = '<div class="alert alert-danger">Gagal memuat berita.</div>';
+    }
+}
+
+async function searchNews() {
+    const queryValue = document.getElementById('newsQuery').value; // Mengambil input user
+    const token = localStorage.getItem('token');
+    const newsOutput = document.getElementById('newsOutput');
+
+    if (!queryValue) return alert("Ketik kata kunci dulu ya!");
+
+    newsOutput.innerHTML = `<div class="col-12 text-center py-5"><div class="spinner-border text-primary"></div></div>`;
+
+    try {
+        const response = await fetch('http://localhost:8000/api/articles/search', {
+            method: 'POST',
+            headers: { 
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            // KUNCINYA DI SINI: Ganti 'query' menjadi 'keyword' agar sesuai Postman
+            body: JSON.stringify({ keyword: queryValue }) 
+        });
+
+        const result = await response.json();
+
+        if (response.ok && result.success) {
+            renderNews(result.data); // Menampilkan hasil pencarian
+        } else {
+            newsOutput.innerHTML = `<div class="alert alert-warning">Berita tidak ditemukan.</div>`;
+        }
+    } catch (e) {
+        console.error("Search Error:", e);
+        newsOutput.innerHTML = '<div class="alert alert-danger">Gagal mencari berita.</div>';
+    }
+}
+
+// FUNGSI PEMBANTU (Agar tidak nulis HTML kartu dua kali)
+function renderNews(articles) {
+    const newsOutput = document.getElementById('newsOutput');
+    let html = '';
+    
+    articles.forEach(art => {
+        html += `
+        <div class="col-md-4 mb-4 d-flex align-items-stretch">
+            <div class="card w-100 border-0 shadow-sm overflow-hidden d-flex flex-column" style="border-radius: 15px;">
+                <div style="height: 180px; width: 100%; overflow: hidden; background: #eee; position: relative;">
+                    <img src="${art.urlToImage || 'https://via.placeholder.com/400x200?text=Eco+News'}" 
+                         style="width: 100%; height: 100%; object-fit: cover;" alt="News">
+                </div>
+                <div class="card-body p-3 d-flex flex-column flex-grow-1">
+                    <h6 class="fw-bold text-dark mb-2" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; height: 2.6em;">
+                        ${art.title}
+                    </h6>
+                    <p class="text-muted mb-4" style="font-size: 0.75rem; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; height: 4.5em;">
+                        ${art.description || 'Klik selengkapnya untuk detail berita.'}
+                    </p>
+                    <div class="mt-auto pt-2 border-top d-flex gap-2">
+                        <a href="${art.url}" target="_blank" class="btn btn-primary btn-sm rounded-pill flex-grow-1 py-2">
+                            Baca
+                        </a>
+                        <button class="btn btn-outline-warning btn-sm rounded-circle" 
+                                onclick="saveArticleFav('${art.title}', '${art.url}', '${art.urlToImage}')"
+                                title="Simpan ke Favorit">
+                            <i class="bi bi-star"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>`;
+    });
+    newsOutput.innerHTML = html || '<p class="text-center w-100">Tidak ada berita.</p>';
+}
+
+async function saveArticleFav(title, url, urlToImage) {
+    const token = localStorage.getItem('token');
+    try {
+        const response = await fetch('http://localhost:8000/api/articles/favorite', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            // Gunakan nama kunci 'image_url' agar rapi di database
+            body: JSON.stringify({ 
+                title: title,
+                url: url,
+                image_url: urlToImage 
+            })
+        });
+        const result = await response.json();
+        if (response.ok && result.success) {
+            alert(' Artikel berhasil disimpan!');
+        }
+    } catch (e) {
+        console.error("Error:", e);
+    }
+}
+
+
+async function fetchArticleFavorites() {
+    const token = localStorage.getItem('token');
+    const output = document.getElementById('articleFavsOutput');
+    
+    output.innerHTML = '<div class="col-12 text-center py-5"><div class="spinner-border text-primary"></div></div>';
+
+    try {
+        const response = await fetch('http://localhost:8000/api/articles/favorites', {
+            method: 'GET',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        const result = await response.json();
+
+        if (response.ok && result.success) {
+            let html = '';
+            result.data.forEach(item => {
+                // KUNCI PERBAIKAN: Cek semua kemungkinan nama kolom gambar
+                const imgPath = item.image_url || 'https://via.placeholder.com/400x200?text=No+Image';
+                
+                html += `
+    <div class="col-md-4 mb-4">
+        <div class="card h-100 border-0 shadow-sm overflow-hidden" style="border-radius: 15px;">
+            <img src="${imgPath}" 
+                 class="card-img-top" 
+                 style="height: 160px; object-fit: cover;"
+                 onerror="this.src='https://via.placeholder.com/400x200?text=Link+Gambar+Rusak'">
+            <div class="card-body d-flex flex-column p-3">
+                <h6 class="fw-bold mb-3" style="font-size: 0.85rem;">${item.title}</h6>
+                <div class="mt-auto d-flex gap-2">
+                    <a href="${item.url}" target="_blank" class="btn btn-sm btn-primary flex-grow-1">Baca</a>
+                    <button class="btn btn-sm btn-outline-danger" onclick="deleteArticleFav(${item.id})">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>`;
+            });
+            output.innerHTML = html || '<div class="col-12 text-center text-muted py-5">Belum ada artikel yang disimpan.</div>';
+        }
+    } catch (e) {
+        console.error("Error Fetch Fav Articles:", e);
+        output.innerHTML = '<div class="alert alert-danger">Gagal memuat favorit.</div>';
+    }
+}
+
+async function deleteArticleFav(id) {
+    if(!confirm("Hapus artikel ini dari favorit?")) return;
+    const token = localStorage.getItem('token');
+
+    try {
+        const response = await fetch(`http://localhost:8000/api/articles/favorite/${id}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (response.ok) {
+            fetchArticleFavorites(); // Refresh list
+        }
+    } catch (e) {
+        alert("Gagal menghapus artikel.");
+    }
+}
+
+// Ambil data profil dari database
+async function getProfile() {
+    const token = localStorage.getItem('token');
+    try {
+        const response = await fetch('http://localhost:8000/api/auth/profile', {
+            method: 'GET',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const result = await response.json();
+        if (response.ok && result.success) {
+            document.getElementById('profileName').value = result.data.username; // atau .name sesuai DB
+            document.getElementById('profileEmail').value = result.data.email;
+        }
+    } catch (e) {
+        console.error("Error Get Profile:", e);
+    }
+}
+
+// Update nama profil ke database
+// Di dalam dashboard.js
+async function updateProfile() {
+    const token = localStorage.getItem('token');
+    const newName = document.getElementById('profileName').value;
+    const currentEmail = document.getElementById('profileEmail').value; // Ambil nilai email
+
+    if (!newName || !currentEmail) {
+        return alert("Data tidak boleh kosong!");
+    }
+
+    try {
+        const response = await fetch('http://localhost:8000/api/auth/profile', {
+            method: 'PUT',
+            headers: { 
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            // Kirim sesuai ekspektasi backend (username dan email)
+            body: JSON.stringify({ 
+                username: newName, 
+                email: currentEmail 
+            }) 
+        });
+
+        const result = await response.json();
+
+        if (response.ok && result.success) {
+            alert(" Profil berhasil diperbarui!");
+        } else {
+            // Perbaikan agar tidak muncul 'undefined' di alert
+            alert(" Gagal update: " + (result.message || result.error || "Terjadi kesalahan"));
+        }
+    } catch (e) {
+        alert("Terjadi kesalahan koneksi ke server.");
+    }
+}
+// Jalankan ini agar saat pertama kali buka Dashboard, berita langsung muncul
+document.addEventListener('DOMContentLoaded', () => {
+    fetchNews(); 
+});
+// JANGAN LUPA: Update juga fungsi fetchNews() kamu agar memanggil renderNews(result.data) 
+// supaya kodenya lebih pendek dan rapi!
