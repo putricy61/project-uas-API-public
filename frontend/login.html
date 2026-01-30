@@ -3,6 +3,233 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EcoAir - West Java Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    
+    <style>
+        :root {
+            --primary-blue: #4A90E2;
+            --bg-soft: #F4F7F9;
+            --text-dark: #2C3E50;
+        }
+        body { background-color: var(--bg-soft); font-family: 'Segoe UI', sans-serif; }
+        .navbar { background-color: white !important; border-bottom: 1px solid #dee2e6; }
+        .content-section { display: none; padding: 40px 0; }
+        .active-section { display: block; animation: fadeIn 0.5s; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .card { border: none; border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+        .map-container {
+            background: white; border-radius: 25px; padding: 30px; position: relative;
+            min-height: 450px; display: flex; align-items: center; justify-content: center;
+            overflow: hidden; border: 1px solid #e9ecef;
+        }
+        /* CSS Diperbarui untuk file PNG internal */
+        .map-container {
+    background: white;
+    border-radius: 25px;
+    /* Hilangkan padding agar gambar bisa menyentuh pinggir */
+    padding: 0 !important; 
+    position: relative;
+    min-height: 450px;
+    height: 450px; /* Tentukan tinggi tetap agar konsisten */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    border: 1px solid #e9ecef;
+}
+
+#jabarMap {
+    /* Gunakan width dan height 100% agar memenuhi kontainer */
+    width: 100%;
+    height: 100%;
+    /* Kuncinya ada di object-fit: cover agar gambar tidak gepeng tapi tetap full */
+    object-fit: cover; 
+    /* Hilangkan filter drop-shadow jika ingin terlihat menyatu dengan frame */
+    filter: none; 
+
+}
+        .rain-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; }
+        .rain-drop { position: absolute; background-color: var(--primary-blue); width: 2px; height: 15px; top: -20px; animation: fall 0.8s linear infinite; }
+        @keyframes fall { to { transform: translateY(500px); } }
+    </style>
+</head>
+<body>
+
+    <nav class="navbar navbar-expand-lg sticky-top shadow-sm">
+        <div class="container">
+            <a class="navbar-brand fw-bold text-primary" href="#">EcoAir</a>
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link px-3 active" href="#" onclick="showSection('weather')">Weather & AQI</a>
+                <a class="nav-link px-3" href="#" onclick="showSection('aqi')">Favorites Weather</a>
+                <a class="nav-link px-3" href="#" onclick="showSection('aqiFavorites')">Favorit AQI</a>
+                <a class="nav-link px-3" href="#" onclick="showSection('articleFavs')">Saved Articles</a>
+                <a class="nav-link px-3" href="#" onclick="showSection('profileSection')"><i class="bi bi-person-circle"></i> Profile</a>
+                <a class="nav-link px-3 text-danger" href="#" onclick="logout()"><i class="bi bi-box-arrow-right"></i></a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <div id="weather" class="content-section active-section">
+            
+            <div class="row g-4">
+                <div class="col-lg-4">
+                    <h4 class="fw-bold mb-3 text-dark">Weather Monitoring</h4>
+                    <div class="input-group mb-3">
+                        <input type="text" id="cityInput" class="form-control border-0 shadow-sm" placeholder="City for Weather..." style="border-radius: 12px 0 0 12px; padding: 12px;">
+                        <button class="btn btn-primary px-4" onclick="fetchWeather()" style="border-radius: 0 12px 12px 0;">Search</button>
+                    </div>
+                    <div id="weatherInfoCard" class="mb-4">
+                        <div class="card p-4 text-center text-muted small shadow-sm">Hasil cuaca muncul di sini</div>
+                    </div>
+                </div>
+
+                <div class="col-lg-8">
+                    <div class="map-container shadow-sm mb-4">
+                        <div style="position: absolute; top: 20px; font-weight: bold; color: #f5f7f8; letter-spacing: 2px;">WEST JAVA MAP</div>
+                        <img id="jabarMap" src="mapss.png" alt="Peta Jawa Barat">
+                        <div id="rainOverlay" class="rain-overlay d-none">
+                            <div class="rain-drop" style="left: 20%;"></div>
+                            <div class="rain-drop" style="left: 40%;"></div>
+                            <div class="rain-drop" style="left: 60%;"></div>
+                            <div class="rain-drop" style="left: 80%;"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-4 mt-2">
+                <div class="col-lg-4">
+                    <h2 class="fw-bold mb-1">Air Quality</h2>
+                    <p class="text-muted mb-4 small">Monitor polusi udara di kota pilihanmu.</p>
+                    <div class="input-group mb-4 shadow-sm" style="border-radius: 12px; overflow: hidden;">
+                        <input type="text" id="aqiInput" class="form-control border-0" placeholder="Ketik nama kota..." style="padding: 12px;">
+                        <button class="btn btn-dark px-4" onclick="fetchAQI()">Cek AQI</button>
+                    </div>
+                    <div id="aqiOutput">
+                        <div class="card p-4 text-center border-0 shadow-sm">
+                            <i class="bi bi-wind text-secondary fs-1 mb-2"></i>
+                            <p class="text-muted mb-0 small">Hasil kualitas udara muncul di sini</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-8 d-flex align-items-end">
+                    <div class="card p-4 border-0 shadow-sm w-100" style="margin-bottom: 24px;">
+                        <h6 class="fw-bold mb-4" style="letter-spacing: 1px; font-size: 0.8rem;">PANDUAN SKALA KUALITAS UDARA (AQI)</h6>
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <div class="p-3 bg-success text-white rounded-4 text-center">
+                                    <h6 class="fw-bold mb-0">0 - 50</h6>
+                                    <small style="font-size: 0.7rem;">BAIK (Good)</small>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="p-3 bg-warning text-dark rounded-4 text-center">
+                                    <h6 class="fw-bold mb-0">51 - 100</h6>
+                                    <small style="font-size: 0.7rem;">SEDANG (Moderate)</small>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="p-3 bg-danger text-white rounded-4 text-center">
+                                    <h6 class="fw-bold mb-0">101+</h6>
+                                    <small style="font-size: 0.7rem;">BURUK (Unhealthy)</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <hr class="my-5 opacity-25">
+            <div class="row">
+                <div class="col-12 d-flex justify-content-between align-items-center mb-4">
+                    <div>
+                        <h2 class="fw-bold mb-0 text-dark">Eco News</h2>
+                        <p class="text-muted small">Update lingkungan terbaru langsung untukmu.</p>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <input type="text" id="newsQuery" class="form-control form-control-sm border-0 shadow-sm" placeholder="Cari berita..." style="border-radius: 20px; width: 220px; padding-left: 15px;">
+                        <button class="btn btn-primary btn-sm rounded-circle shadow-sm" onclick="searchNews()">
+                            <i class="bi bi-search"></i>
+                        </button>
+                        <button class="btn btn-outline-secondary btn-sm rounded-circle shadow-sm" onclick="fetchNews()">
+                            <i class="bi bi-arrow-clockwise"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div id="newsOutput" class="row g-4 mb-5">
+            </div>
+        </div>
+
+        <div id="aqi" class="content-section">
+            <h2 class="fw-bold">My Weather Favorites & Stats</h2>
+            <div class="row g-3 mb-5" id="statsOutput"></div>
+            <h5 class="fw-bold mb-3">Saved Cities (Weather)</h5>
+            <div id="favoritesOutput" class="row g-3"></div>
+        </div>
+
+        <div id="aqiFavorites" class="content-section">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2 class="fw-bold">My AQI Favorites</h2>
+                <button class="btn btn-sm btn-outline-dark" onclick="fetchAqiFavorites()">
+                    <i class="bi bi-arrow-clockwise"></i> Refresh AQI
+                </button>
+            </div>
+            <p class="text-muted">Daftar riwayat kualitas udara yang kamu simpan.</p>
+            <div id="aqiFavoritesOutput" class="row g-3"></div>
+        </div>
+
+        <div id="articleFavs" class="content-section">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2 class="fw-bold">My Saved Articles</h2>
+                <button class="btn btn-sm btn-outline-primary rounded-pill" onclick="fetchArticleFavorites()">
+                    <i class="bi bi-arrow-clockwise"></i> Refresh
+                </button>
+            </div>
+            <div id="articleFavsOutput" class="row g-4"></div>
+        </div>
+        <div id="profileSection" class="content-section">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card p-4 shadow-sm">
+                <h3 class="fw-bold mb-4 text-center">My Profile</h3>
+                <div class="text-center mb-4">
+                    <div class="bg-primary text-white rounded-circle d-inline-flex align-items-center justify-content-center" style="width: 80px; height: 80px; font-size: 2rem;">
+                        <i class="bi bi-person"></i>
+                    </div>
+                </div>
+                <form id="profileForm">
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Nama Lengkap</label>
+                        <input type="text" id="profileName" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Email</label>
+                        <input type="email" id="profileEmail" class="form-control" readonly style="background-color: #e9ecef;">
+                        <div class="form-text text-muted">Email tidak dapat diubah.</div>
+                    </div>
+                    <div class="d-grid gap-2 mt-4">
+                        <button type="button" class="btn btn-primary" onclick="updateProfile()">Simpan Perubahan</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+    </div>
+
+    <script src="dashboard.js"></script>
+</body>
+</html>
+<!-- <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login - Air Quality System</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
@@ -148,4 +375,4 @@
         });
     </script>
 </body>
-</html>
+</html> -->
